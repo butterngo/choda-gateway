@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from "vitest";
 
-describe('skeleton smoke', () => {
-  it('package builds and imports', async () => {
-    const mod = await import('../dist/cli.js')
-    expect(mod).toBeTruthy()
-  })
-})
+describe("skeleton smoke", () => {
+	it("package builds and imports", async () => {
+		const mod = await import("../dist/cli.js");
+		expect(mod).toBeTruthy();
+	});
+});
