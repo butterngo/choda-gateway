@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+secrets.enc
+secrets.enc.bak
+logs/*.jsonl
+.env
+.env.*
+!.env.example
+.vscode/
+!.vscode/mcp.json.example
