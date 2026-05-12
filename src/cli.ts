@@ -6,7 +6,10 @@ import { parseArgs } from "node:util";
 const DEBUG_LOG = "C:/dev/choda-gateway/gateway-debug.log";
 function dbg(msg: string): void {
 	try {
-		appendFileSync(DEBUG_LOG, `${new Date().toISOString()} [pid=${process.pid}] ${msg}\n`);
+		appendFileSync(
+			DEBUG_LOG,
+			`${new Date().toISOString()} [pid=${process.pid}] ${msg}\n`,
+		);
 	} catch {
 		// best effort
 	}
@@ -16,8 +19,14 @@ process.on("beforeExit", (code) => dbg(`beforeExit code=${code}`));
 process.on("SIGINT", () => dbg("SIGINT"));
 process.on("SIGTERM", () => dbg("SIGTERM"));
 process.on("SIGHUP", () => dbg("SIGHUP"));
-process.on("uncaughtException", (err) => dbg(`uncaughtException: ${err?.stack ?? err}`));
-process.on("unhandledRejection", (reason) => dbg(`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`));
+process.on("uncaughtException", (err) =>
+	dbg(`uncaughtException: ${err?.stack ?? err}`),
+);
+process.on("unhandledRejection", (reason) =>
+	dbg(
+		`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`,
+	),
+);
 process.stdin.on?.("end", () => dbg("stdin end"));
 process.stdin.on?.("close", () => dbg("stdin close"));
 process.stdout.on?.("error", (e) => dbg(`stdout error: ${e?.message ?? e}`));
@@ -339,9 +348,12 @@ const invokedDirectly = (() => {
 
 if (invokedDirectly) {
 	main().catch((err) => {
-		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+		const detail =
+			err instanceof Error ? (err.stack ?? err.message) : String(err);
 		dbg(`main rejected: ${detail}`);
-		process.stderr.write(`error: ${err instanceof Error ? err.message : String(err)}\n`);
+		process.stderr.write(
+			`error: ${err instanceof Error ? err.message : String(err)}\n`,
+		);
 		process.exit(1);
 	});
 }
