@@ -27,7 +27,9 @@ function logHandshake(direction: "in" | "out", payload: unknown): void {
 		const line = `${new Date().toISOString()} ${direction === "in" ? "<<<" : ">>>"} ${JSON.stringify(payload)}\n`;
 		appendFileSync(HANDSHAKE_LOG, line);
 	} catch (err) {
-		process.stderr.write(`[spike] handshake log write failed: ${String(err)}\n`);
+		process.stderr.write(
+			`[spike] handshake log write failed: ${String(err)}\n`,
+		);
 	}
 }
 
@@ -70,7 +72,9 @@ function buildServer(): Server {
 		const result = {
 			ok: true as const,
 			ts: new Date().toISOString(),
-			...(parsed.data.message !== undefined ? { echo: parsed.data.message } : {}),
+			...(parsed.data.message !== undefined
+				? { echo: parsed.data.message }
+				: {}),
 		};
 		return {
 			content: [{ type: "text", text: JSON.stringify(result) }],
