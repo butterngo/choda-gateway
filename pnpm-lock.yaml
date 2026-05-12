@@ -11,6 +11,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       libsodium-wrappers-sumo:
         specifier: 0.8.4
         version: 0.8.4
@@ -36,9 +39,6 @@ importers:
       '@types/node':
         specifier: 22.15.29
         version: 22.15.29
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       ajv-cli:
         specifier: ^5.0.0
         version: 5.0.0
