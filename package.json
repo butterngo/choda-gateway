@@ -8,7 +8,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "tsup src/cli.ts --format esm --target node22 --out-dir dist",
+    "build": "tsup src/cli.ts src/spike-server.ts --format esm --target node22 --out-dir dist",
     "test": "vitest run",
     "lint": "biome check src tests",
     "format": "biome format --write src tests"
