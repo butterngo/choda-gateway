@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/butterngo/choda-gateway/tools.schema.json",
+  "title": "choda-gateway tool manifest v1",
+  "description": "Schema for tools.json — declarative tool registry consumed by the gateway. See docs/knowledge/ADR-001-architecture-overview.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tools"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/Tool" }
+    }
+  },
+  "definitions": {
+    "Tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "inputSchema",
+        "tags",
+        "upstream",
+        "concurrency",
+        "timeoutMs",
+        "retryPolicy",
+        "sideEffecting"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9_-]{0,30}[a-z0-9])?__[a-z0-9][a-z0-9_]{0,62}[a-z0-9]$",
+          "maxLength": 128,
+          "description": "namespace__action — see ADR-005. Lowercase, snake_case action, double-underscore separator."
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "inputSchema": {
+          "type": "object",
+          "description": "JSON Schema for the tool input (MCP standard)."
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$",
+            "maxLength": 64
+          },
+          "description": "Lowercase alphanumeric + dash. Used by profile filter — see ADR-002."
+        },
+        "upstream": { "$ref": "#/definitions/Upstream" },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "Per-tool concurrent call cap. See ADR-004."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        },
+        "retryPolicy": {
+          "enum": ["none", "safe-idempotent"]
+        },
+        "sideEffecting": {
+          "type": "boolean",
+          "description": "True if the tool mutates upstream state. Drives supervisor restart policy (Hybrid — see Spike-2 in docs/spike-results/spike-2-crash-isolation.md) and retry safety."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "upstream": { "properties": { "type": { "const": "cli" } } } } },
+          "then": {
+            "properties": {
+              "concurrency": { "const": 1 },
+              "retryPolicy": { "const": "none" }
+            },
+            "description": "CLI hard constraint per ADR-004: concurrency=1, retryPolicy=none."
+          }
+        }
+      ]
+    },
+    "Upstream": {
+      "oneOf": [
+        { "$ref": "#/definitions/UpstreamMcp" },
+        { "$ref": "#/definitions/UpstreamRest" },
+        { "$ref": "#/definitions/UpstreamCli" }
+      ]
+    },
+    "UpstreamMcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "command", "remoteTool"],
+      "properties": {
+        "type": { "const": "mcp" },
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "remoteTool": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the tool on the upstream MCP server (gateway re-exposes it under its own .name)."
+        }
+      }
+    },
+    "UpstreamRest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "method", "url"],
+      "properties": {
+        "type": { "const": "rest" },
+        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "url": {
+          "type": "string",
+          "description": "May contain {{input.*}} and {{secrets.*}} placeholders."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "bodyTemplate": {
+          "description": "Optional request body. May contain {{input.*}} placeholders."
+        }
+      }
+    },
+    "UpstreamCli": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "command"],
+      "properties": {
+        "type": { "const": "cli" },
+        "command": { "type": "string", "minLength": 1 },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Each arg may contain {{input.*}} placeholders. Gateway shell-escapes; never interpolate into the command string."
+        },
+        "env": { "type": "object", "additionalProperties": { "type": "string" } },
+        "cwd": { "type": "string" }
+      }
+    }
+  }
+}

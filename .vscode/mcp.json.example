@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "gateway-coding": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/cli.js", "start", "--profile=coding"]
+    },
+    "gateway-ops": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/cli.js", "start", "--profile=ops"]
+    }
+  }
+}

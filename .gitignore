@@ -4,8 +4,13 @@ dist/
 secrets.enc
 secrets.enc.bak
 logs/*.jsonl
+audit.jsonl
 .env
 .env.*
 !.env.example
-.vscode/
+.vscode/*
 !.vscode/mcp.json.example
+
+# User config copies (see Quick start in README)
+gateway.config.yaml
+tools.json
