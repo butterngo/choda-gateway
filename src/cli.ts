@@ -1,6 +1,27 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
 import { parseArgs } from "node:util";
+
+// Diagnostic log so we can trace process lifecycle when running under an MCP host.
+const DEBUG_LOG = "C:/dev/choda-gateway/gateway-debug.log";
+function dbg(msg: string): void {
+	try {
+		appendFileSync(DEBUG_LOG, `${new Date().toISOString()} [pid=${process.pid}] ${msg}\n`);
+	} catch {
+		// best effort
+	}
+}
+process.on("exit", (code) => dbg(`process exit code=${code}`));
+process.on("beforeExit", (code) => dbg(`beforeExit code=${code}`));
+process.on("SIGINT", () => dbg("SIGINT"));
+process.on("SIGTERM", () => dbg("SIGTERM"));
+process.on("SIGHUP", () => dbg("SIGHUP"));
+process.on("uncaughtException", (err) => dbg(`uncaughtException: ${err?.stack ?? err}`));
+process.on("unhandledRejection", (reason) => dbg(`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`));
+process.stdin.on?.("end", () => dbg("stdin end"));
+process.stdin.on?.("close", () => dbg("stdin close"));
+process.stdout.on?.("error", (e) => dbg(`stdout error: ${e?.message ?? e}`));
+dbg(`boot argv=${JSON.stringify(process.argv)} cwd=${process.cwd()}`);
 import { createAuditLogger } from "./audit/logger.js";
 import { buildMcpServer, startStdioServer } from "./index.js";
 import { loadGatewayConfig, loadToolsManifest } from "./manifest/loader.js";
@@ -273,6 +294,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 	switch (cmd) {
 		case "start":
 			await cmdStart(cli);
+			// Keep the event loop alive. Some MCP clients (e.g. Claude Desktop on
+			// Windows) close their stdin pipe after the handshake, which lets the
+			// MCP SDK's stdio transport release its 'data' listener and the Node
+			// process drains the loop and exits 0. The transport itself stays
+			// usable for outgoing messages, so we just need to prevent the early
+			// exit. The promise never resolves; the host kills us via SIGTERM/exit.
+			await new Promise<never>(() => {});
 			return;
 		case "tools":
 			if (rest[0] !== "list") throw new Error(`unknown tools sub: ${rest[0]}`);
@@ -311,9 +339,9 @@ const invokedDirectly = (() => {
 
 if (invokedDirectly) {
 	main().catch((err) => {
-		process.stderr.write(
-			`error: ${err instanceof Error ? err.message : String(err)}\n`,
-		);
+		const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+		dbg(`main rejected: ${detail}`);
+		process.stderr.write(`error: ${err instanceof Error ? err.message : String(err)}\n`);
 		process.exit(1);
 	});
 }

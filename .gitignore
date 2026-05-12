@@ -14,3 +14,6 @@ audit.jsonl
 # User config copies (see Quick start in README)
 gateway.config.yaml
 tools.json
+
+# Runtime data (e.g. SQLite DBs from upstream MCP children)
+data/
