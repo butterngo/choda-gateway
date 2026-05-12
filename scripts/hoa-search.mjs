@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// timesheet-days-off.mjs — wrap Mantu timesheet days-off-summary with az CLI delegated token.
+// hoa-search.mjs — wrap Mantu HoA navigation/search with az CLI delegated token.
 // See vault/30-Knowledge/mantu-erp-azure-cli-delegated-token.md for why scope=api://erpapi/UseErp works for arp.mantu.com.
 
 import { execFile } from "node:child_process";
@@ -19,18 +19,21 @@ function requireEnv(name) {
 
 const TENANT = requireEnv("MANTU_TENANT_ID");
 const SCOPE = requireEnv("MANTU_API_SCOPE");
-const BASE = requireEnv("MANTU_TIMESHEET_BASE_URL");
+const BASE = requireEnv("MANTU_HOA_BASE_URL");
 
 const { values } = parseArgs({
 	args: process.argv.slice(2),
 	options: {
-		year: { type: "string" },
+		searchText: { type: "string" },
+		searchType: { type: "string", default: "All" },
+		page: { type: "string", default: "1" },
+		rowsPerPage: { type: "string", default: "5" },
 	},
 	strict: true,
 });
 
-if (!values.year) {
-	process.stderr.write("error: --year required\n");
+if (!values.searchText) {
+	process.stderr.write("error: --searchText required\n");
 	process.exit(1);
 }
 
@@ -48,7 +51,12 @@ async function getToken() {
 
 async function main() {
 	const token = await getToken();
-	const qs = new URLSearchParams({ year: values.year }).toString();
+	const qs = new URLSearchParams({
+		searchText: values.searchText,
+		searchType: values.searchType,
+		page: values.page,
+		rowsPerPage: values.rowsPerPage,
+	}).toString();
 	const url = `${BASE}?${qs}`;
 	const res = await fetch(url, {
 		headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
