@@ -68,7 +68,7 @@
         },
         "sideEffecting": {
           "type": "boolean",
-          "description": "True if the tool mutates upstream state. Drives supervisor restart policy (Hybrid — see Spike-2 in docs/spike-results/spike-2-crash-isolation.md) and retry safety."
+          "description": "True if the tool mutates upstream state. Drives supervisor restart policy (Hybrid) and retry safety."
         }
       },
       "allOf": [
