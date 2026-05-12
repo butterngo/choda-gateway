@@ -21,6 +21,12 @@ export interface SecretStore {
 	has(name: string): Promise<boolean>;
 	list(): Promise<string[]>;
 	maskValue(value: string): boolean;
+	/**
+	 * Iterable of every plaintext secret value loaded so far (required at open()
+	 * plus any value materialised by lazy get()). Consumed by the audit logger
+	 * to mask substring occurrences in log lines.
+	 */
+	maskedValues(): Iterable<string>;
 }
 
 export interface OpenSecretStoreOptions {
@@ -138,6 +144,9 @@ export async function openSecretStore(
 		},
 		maskValue(value: string): boolean {
 			return value.length > 0 && maskedValues.has(value);
+		},
+		maskedValues(): Iterable<string> {
+			return maskedValues;
 		},
 	};
 }
