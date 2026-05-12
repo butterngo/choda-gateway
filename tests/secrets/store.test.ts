@@ -10,7 +10,7 @@ import {
 	setSecret,
 } from "../../src/secrets/store.js";
 
-const PASSWORD = "spike-test-pw-1";
+const PASSWORD = "test-pw-1";
 
 let dir: string;
 let storePath: string;

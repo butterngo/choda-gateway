@@ -1,6 +1,6 @@
 # choda-gateway
 
-> Status: **Phase-0** (design + spike). Phase-1 implementation in progress.
+> Status: **Phase-1** implementation in progress.
 
 ## What it is
 
@@ -95,9 +95,9 @@ pnpm lint          # biome
 Current limitations (Phase-0/1 MVP scope):
 
 - **HTTP downstream not implemented** — only stdio MCP downstream is supported. Gemini and other non-MCP clients are deferred to Phase 2 (revisit when needed; see ADR-001).
-- **Tested on Windows only.** Spike-1 latency (p95 ≈ 1ms) and Spike-2 crash isolation were validated on Windows 11 + Node 22; Linux signal-payload parity is deferred to Phase-1 CI.
+- **Tested on Windows only.** Validated on Windows 11 + Node 22; Linux signal-payload parity is deferred to Phase-1 CI.
 - **No auth.** The gateway trusts its local process boundary; multi-user / RBAC is out of scope.
 - **No log rotation.** Audit JSONL grows unbounded — rotation is Phase 2.
 - **No encrypted secret store.** Phase-1 reads from `process.env`. See "Quick start" for the deferral rationale.
 
-For supervisor strategy (restart vs fail-closed on upstream crash, keyed off `sideEffecting`), see the Spike-2 report under `docs/spike-results/`. ADR-006 will formalise it once Phase-1 lands the supervisor module.
+For supervisor strategy (restart vs fail-closed on upstream crash, keyed off `sideEffecting`), ADR-006 will formalise it once Phase-1 lands the supervisor module.

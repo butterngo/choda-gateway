@@ -11,7 +11,7 @@ describe("libsodium WASM init time", () => {
 		await sodium.ready;
 		const elapsed = performance.now() - t0;
 
-		// Spike-5 measured ~10ms. Budget keeps a healthy margin for CI flake.
+		// Typical init ~10ms locally. Budget keeps a healthy margin for CI flake.
 		expect(elapsed).toBeLessThan(500);
 	});
 });

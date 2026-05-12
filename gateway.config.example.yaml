@@ -5,9 +5,8 @@
 toolsPath: ./tools.json
 auditPath: ./audit.jsonl
 
-# Secret loading strategy is being decided in TASK-694 (libsodium spike TASK-692 deferred
-# for local-only use). For now, secrets referenced via {{secrets.X}} in tools.json are
-# read from process.env at startup.
+# Secret loading strategy is being decided in TASK-694. For now, secrets referenced
+# via {{secrets.X}} in tools.json are read from process.env at startup.
 secrets:
   source: env # env | file (file form will land with TASK-694)
 
