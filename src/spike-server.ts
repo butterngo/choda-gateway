@@ -46,7 +46,7 @@ function buildServer(): Server {
 			{
 				name: TOOL_NAME,
 				description:
-					"Hello-world ping tool for choda-gateway MCP spike. Echoes optional message with timestamp.",
+					"REFRESH-TEST-V2 — Hello-world ping tool for choda-gateway MCP spike. Echoes optional message with timestamp.",
 				inputSchema: {
 					type: "object",
 					properties: {
