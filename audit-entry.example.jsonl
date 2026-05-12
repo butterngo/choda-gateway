@@ -1,0 +1,4 @@
+{"event":"request.received","corrId":"corr_01HV2TPQ7XJZB9C0XMRYK4N8FA","ts":"2026-05-12T06:30:00.000Z","toolName":"linear__issue_search","profile":"coding","input":{"query":"gateway"},"secretRefs":["LINEAR_API_KEY"]}
+{"event":"upstream.dispatched","corrId":"corr_01HV2TPQ7XJZB9C0XMRYK4N8FA","ts":"2026-05-12T06:30:00.002Z","toolName":"linear__issue_search","profile":"coding","upstreamType":"rest","upstreamId":"POST https://api.linear.app/graphql","attempt":1}
+{"event":"upstream.completed","corrId":"corr_01HV2TPQ7XJZB9C0XMRYK4N8FA","ts":"2026-05-12T06:30:00.187Z","toolName":"linear__issue_search","profile":"coding","upstreamType":"rest","durationMs":185,"ok":true}
+{"event":"response.returned","corrId":"corr_01HV2TPQ7XJZB9C0XMRYK4N8FA","ts":"2026-05-12T06:30:00.189Z","toolName":"linear__issue_search","profile":"coding","durationMs":189,"ok":true}

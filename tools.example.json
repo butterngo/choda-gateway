@@ -1,0 +1,80 @@
+{
+  "$schema": "./tools.schema.json",
+  "tools": [
+    {
+      "name": "tasks__task_list",
+      "description": "List tasks from the choda-deck MCP upstream filtered by status.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "enum": ["TODO", "READY", "IN-PROGRESS", "DONE", "CANCELLED"] },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        }
+      },
+      "tags": ["coding", "planning"],
+      "upstream": {
+        "type": "mcp",
+        "command": "node",
+        "args": ["C:/dev/choda-deck/dist/mcp-server.cjs"],
+        "remoteTool": "task_list"
+      },
+      "concurrency": 4,
+      "timeoutMs": 30000,
+      "retryPolicy": "none",
+      "sideEffecting": false
+    },
+    {
+      "name": "linear__issue_search",
+      "description": "Search Linear issues by query string. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "minLength": 1 },
+          "teamId": { "type": "string" }
+        }
+      },
+      "tags": ["coding", "planning"],
+      "upstream": {
+        "type": "rest",
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "headers": {
+          "Authorization": "Bearer {{secrets.LINEAR_API_KEY}}",
+          "Content-Type": "application/json"
+        },
+        "bodyTemplate": {
+          "query": "query($q:String!){issues(filter:{title:{contains:$q}}){nodes{id title state{name}}}}",
+          "variables": { "q": "{{input.query}}" }
+        }
+      },
+      "concurrency": 8,
+      "timeoutMs": 15000,
+      "retryPolicy": "safe-idempotent",
+      "sideEffecting": false
+    },
+    {
+      "name": "gh__pr_list",
+      "description": "List GitHub pull requests via gh CLI in a given repo.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo"],
+        "properties": {
+          "repo": { "type": "string", "pattern": "^[\\w.-]+/[\\w.-]+$" },
+          "state": { "enum": ["open", "closed", "merged", "all"] }
+        }
+      },
+      "tags": ["coding"],
+      "upstream": {
+        "type": "cli",
+        "command": "gh",
+        "args": ["pr", "list", "--repo", "{{input.repo}}", "--state", "{{input.state}}", "--json", "number,title,state,author"]
+      },
+      "concurrency": 1,
+      "timeoutMs": 30000,
+      "retryPolicy": "none",
+      "sideEffecting": false
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/butterngo/choda-gateway/audit-entry.schema.json",
+  "title": "choda-gateway audit log entry v1",
+  "description": "One line of audit.jsonl. Four event types form the request lifecycle: request.received -> upstream.dispatched -> upstream.completed -> response.returned. Secret values are masked to *** before serialization; secretRefs records which secret names were resolved.",
+  "oneOf": [
+    { "$ref": "#/definitions/RequestReceived" },
+    { "$ref": "#/definitions/UpstreamDispatched" },
+    { "$ref": "#/definitions/UpstreamCompleted" },
+    { "$ref": "#/definitions/ResponseReturned" }
+  ],
+  "definitions": {
+    "Common": {
+      "type": "object",
+      "required": ["event", "corrId", "ts", "toolName", "profile"],
+      "properties": {
+        "event": { "type": "string" },
+        "corrId": {
+          "type": "string",
+          "pattern": "^corr_[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID-based correlation id (corr_<ulid>)."
+        },
+        "ts": { "type": "string", "format": "date-time" },
+        "toolName": { "type": "string" },
+        "profile": { "type": "string" }
+      }
+    },
+    "RequestReceived": {
+      "allOf": [
+        { "$ref": "#/definitions/Common" },
+        {
+          "type": "object",
+          "required": ["event", "input", "secretRefs"],
+          "properties": {
+            "event": { "const": "request.received" },
+            "input": {
+              "description": "Tool input as received from the client. Secret placeholders are kept literal (not resolved yet)."
+            },
+            "secretRefs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Names of secrets referenced via {{secrets.X}} in the request, prior to resolution."
+            }
+          }
+        }
+      ]
+    },
+    "UpstreamDispatched": {
+      "allOf": [
+        { "$ref": "#/definitions/Common" },
+        {
+          "type": "object",
+          "required": ["event", "upstreamType", "upstreamId", "attempt"],
+          "properties": {
+            "event": { "const": "upstream.dispatched" },
+            "upstreamType": { "enum": ["mcp", "rest", "cli"] },
+            "upstreamId": { "type": "string", "description": "Identifier of the upstream call (e.g. command path, http URL with placeholders, remoteTool name). Secret values masked." },
+            "attempt": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "UpstreamCompleted": {
+      "allOf": [
+        { "$ref": "#/definitions/Common" },
+        {
+          "type": "object",
+          "required": ["event", "upstreamType", "durationMs", "ok"],
+          "properties": {
+            "event": { "const": "upstream.completed" },
+            "upstreamType": { "enum": ["mcp", "rest", "cli"] },
+            "durationMs": { "type": "integer", "minimum": 0 },
+            "ok": { "type": "boolean" },
+            "errKind": { "type": "string", "description": "Present when ok=false. E.g. 'timeout', 'crash', 'http_5xx', 'decrypt_error'." }
+          }
+        }
+      ]
+    },
+    "ResponseReturned": {
+      "allOf": [
+        { "$ref": "#/definitions/Common" },
+        {
+          "type": "object",
+          "required": ["event", "durationMs", "ok"],
+          "properties": {
+            "event": { "const": "response.returned" },
+            "durationMs": { "type": "integer", "minimum": 0, "description": "End-to-end latency (request.received to response.returned)." },
+            "ok": { "type": "boolean" },
+            "errKind": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

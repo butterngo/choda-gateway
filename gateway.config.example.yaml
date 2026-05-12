@@ -1,0 +1,19 @@
+# choda-gateway runtime config. Copy to gateway.config.yaml and edit.
+# See docs/knowledge/ADR-002-tag-profile-tool-exposure.md for tag/profile mechanics.
+
+# Manifest + audit paths are resolved relative to this file.
+toolsPath: ./tools.json
+auditPath: ./audit.jsonl
+
+# Secret loading strategy is being decided in TASK-694 (libsodium spike TASK-692 deferred
+# for local-only use). For now, secrets referenced via {{secrets.X}} in tools.json are
+# read from process.env at startup.
+secrets:
+  source: env # env | file (file form will land with TASK-694)
+
+# Tag-to-profile mapping. CLI flag --profile=<name> or env GATEWAY_PROFILE picks one.
+# A tool is exposed iff intersection(tool.tags, profile.tags) >= 1.
+profiles:
+  coding: [coding, planning]
+  ops: [ops, infra]
+  all: [coding, planning, ops, infra]
