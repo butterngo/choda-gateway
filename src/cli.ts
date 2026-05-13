@@ -1,36 +1,6 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
-
-// Diagnostic log so we can trace process lifecycle when running under an MCP host.
-const DEBUG_LOG = "C:/dev/choda-gateway/gateway-debug.log";
-function dbg(msg: string): void {
-	try {
-		appendFileSync(
-			DEBUG_LOG,
-			`${new Date().toISOString()} [pid=${process.pid}] ${msg}\n`,
-		);
-	} catch {
-		// best effort
-	}
-}
-process.on("exit", (code) => dbg(`process exit code=${code}`));
-process.on("beforeExit", (code) => dbg(`beforeExit code=${code}`));
-process.on("SIGINT", () => dbg("SIGINT"));
-process.on("SIGTERM", () => dbg("SIGTERM"));
-process.on("SIGHUP", () => dbg("SIGHUP"));
-process.on("uncaughtException", (err) =>
-	dbg(`uncaughtException: ${err?.stack ?? err}`),
-);
-process.on("unhandledRejection", (reason) =>
-	dbg(
-		`unhandledRejection: ${reason instanceof Error ? reason.stack : String(reason)}`,
-	),
-);
-process.stdin.on?.("end", () => dbg("stdin end"));
-process.stdin.on?.("close", () => dbg("stdin close"));
-process.stdout.on?.("error", (e) => dbg(`stdout error: ${e?.message ?? e}`));
-dbg(`boot argv=${JSON.stringify(process.argv)} cwd=${process.cwd()}`);
 import { createAuditLogger } from "./audit/logger.js";
 import { buildMcpServer, startStdioServer } from "./index.js";
 import { loadGatewayConfig, loadToolsManifest } from "./manifest/loader.js";
