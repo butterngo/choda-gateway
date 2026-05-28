@@ -274,3 +274,137 @@ describe("rest-adapter", () => {
 		).toThrow(/rest/);
 	});
 });
+
+describe("rest-adapter — credential provider integration", () => {
+	it("merges provider-resolved headers into the outbound request", async () => {
+		handle = await startServer(() => ({ status: 200, body: '{"ok":true}' }));
+		const provider = {
+			type: "bearer-static" as const,
+			async resolve() {
+				return { headers: { Authorization: "Bearer provider-tok" } };
+			},
+		};
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+				authProfile: "test-bearer",
+			}),
+			{ credentialProvider: provider },
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(handle.requests[0].headers.authorization).toBe(
+			"Bearer provider-tok",
+		);
+		expect(r.meta?.httpStatus).toBe(200);
+		await adapter.dispose();
+	});
+
+	it("provider headers override per-tool template headers on case-insensitive collision", async () => {
+		handle = await startServer(() => ({ status: 200, body: "ok" }));
+		const provider = {
+			type: "bearer-static" as const,
+			async resolve() {
+				return { headers: { Authorization: "Bearer provider" } };
+			},
+		};
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+					headers: { Authorization: "Bearer manifest" },
+				},
+				authProfile: "test-bearer",
+			}),
+			{ credentialProvider: provider },
+		);
+		await adapter.init(makeCtx());
+		await adapter.call(makeCall());
+		expect(handle.requests[0].headers.authorization).toBe("Bearer provider");
+		await adapter.dispose();
+	});
+
+	it("merges provider query into URL (api-key location=query)", async () => {
+		handle = await startServer(() => ({ status: 200, body: "ok" }));
+		const provider = {
+			type: "api-key" as const,
+			async resolve() {
+				return { headers: {}, query: { api_key: "abc123" } };
+			},
+		};
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q?existing=1`,
+				},
+				authProfile: "test-key",
+			}),
+			{ credentialProvider: provider },
+		);
+		await adapter.init(makeCtx());
+		await adapter.call(makeCall());
+		const url = handle.requests[0].url;
+		expect(url).toContain("existing=1");
+		expect(url).toContain("api_key=abc123");
+		await adapter.dispose();
+	});
+
+	it("provider failure -> AuthResolveError (no fall-through to unauthenticated request)", async () => {
+		handle = await startServer(() => ({ status: 200, body: "ok" }));
+		const provider = {
+			type: "bearer-static" as const,
+			async resolve(): Promise<never> {
+				throw new Error("token endpoint down");
+			},
+		};
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+				retryPolicy: "none",
+				authProfile: "test-bearer",
+			}),
+			{ credentialProvider: provider },
+		);
+		await adapter.init(makeCtx());
+		await expect(
+			adapter.call(
+				makeCall({
+					policy: { ...makeCall().policy, retryPolicy: "none" },
+				}),
+			),
+		).rejects.toThrow(/auth provider failed/);
+		// Server should NOT have been called — provider error short-circuits.
+		expect(handle.requests).toHaveLength(0);
+		await adapter.dispose();
+	});
+
+	it("regression: tool without credentialProvider works exactly as before", async () => {
+		handle = await startServer(() => ({ status: 200, body: "ok" }));
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+			}),
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(r.meta?.httpStatus).toBe(200);
+		expect(handle.requests[0].headers.authorization).toBeUndefined();
+		await adapter.dispose();
+	});
+});
