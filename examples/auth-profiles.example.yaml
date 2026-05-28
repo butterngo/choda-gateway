@@ -1,0 +1,46 @@
+# Example auth-profiles.yaml — one entry per provider type.
+# Copy to ./auth-profiles.yaml and replace ${secret:KEY} references with
+# real keys you have stored in secrets.enc (via `choda-gateway secrets set`),
+# and ${path:KEY} references with absolute paths declared under
+# `gateway.config.yaml > paths`.
+
+profiles:
+  # 1. bearer-static — hardcoded dev token (good for sandboxes; avoid in prod).
+  example-static:
+    type: bearer-static
+    token: ${secret:EXAMPLE_DEV_TOKEN}
+
+  # 2. api-key — single header or query param, static value.
+  example-key:
+    type: api-key
+    location: header
+    name: X-API-Key
+    value: ${secret:EXAMPLE_API_KEY}
+
+  # 3. oauth2-cc — client_credentials grant (typical B2B / service-to-service).
+  example-oauth:
+    type: oauth2-cc
+    tokenUrl: https://auth.example.com/oauth/token
+    clientId: ${secret:EXAMPLE_OAUTH_CLIENT_ID}
+    clientSecret: ${secret:EXAMPLE_OAUTH_CLIENT_SECRET}
+    scope: orders:read orders:write
+    clientAuth: basic # or `body`
+
+  # 4. cookie-jar — forwards a cookies.txt file as the Cookie header.
+  # Useful for dev-only APIs that require an authenticated browser session.
+  example-cookie:
+    type: cookie-jar
+    cookieFile: ${path:example_cookies}
+    forwardHeaders: [cookie]
+    extraHeaders:
+      X-Tenant-Id: example-tenant-a
+
+  # 5. exec-script — escape hatch: runs a subprocess, parses stdout.
+  # Use when no typed provider fits (e.g. `gcloud auth print-access-token`,
+  # `az account get-access-token`, custom JWT mints).
+  example-exec:
+    type: exec-script
+    command: [gcloud, auth, print-access-token]
+    cacheTtlSeconds: 3000
+    headerTemplate:
+      Authorization: Bearer {output}
