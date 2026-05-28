@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import sodium from "libsodium-wrappers-sumo";
 import {
 	DecryptError,
@@ -23,6 +23,7 @@ import {
 	parseEntries,
 	readHeader,
 } from "./header.js";
+import { withStoreWriteLock } from "./locks.js";
 
 export type CryptoBackend = "libsodium" | "node:crypto";
 
@@ -292,5 +293,17 @@ export async function setSecret(opts: SetSecretOptions): Promise<void> {
 		nonce: nonce.toString("base64"),
 		ct: ct.toString("base64"),
 	})}\n`;
-	await appendFile(opts.storePath, line);
+	// Serialise read-then-writeFile per store path so parallel setSecret calls
+	// can't race (TASK-976). We avoid `fs.appendFile` because its O_APPEND
+	// semantics are unreliable on Windows NTFS — back-to-back parallel appends
+	// even under a JS-level mutex have been observed to lose or duplicate
+	// writes. Full-file rewrite is wasteful but safe; a secret store is small
+	// (~bytes per entry × O(10s) of entries).
+	await withStoreWriteLock(opts.storePath, async () => {
+		const existing = await readFile(opts.storePath);
+		await writeFile(
+			opts.storePath,
+			Buffer.concat([existing, Buffer.from(line, "utf8")]),
+		);
+	});
 }
