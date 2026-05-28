@@ -1,4 +1,5 @@
 import { fetch } from "undici";
+import { AuthResolveError, type CredentialProvider } from "../auth/types.js";
 import type { Tool } from "../manifest/types.js";
 import type {
 	AdapterContext,
@@ -48,6 +49,13 @@ export interface RestAdapterOptions {
 	 * Sleep function (for tests) — replaces `setTimeout`-based delay.
 	 */
 	sleep?: (ms: number) => Promise<void>;
+	/**
+	 * Resolved per `tool.authProfile`. When present, `resolve()` is awaited
+	 * before each outbound request and the resulting headers + query are
+	 * merged in. Provider failure → `AuthResolveError` (no fall-through to
+	 * an unauthenticated request).
+	 */
+	credentialProvider?: CredentialProvider;
 }
 
 const DEFAULT_BACKOFF = [200, 500];
@@ -62,6 +70,7 @@ export function createRestAdapter(
 	const fetchImpl = opts.fetchImpl ?? fetch;
 	const sleep = opts.sleep ?? defaultSleep;
 	const backoff = opts.backoffSchedule ?? DEFAULT_BACKOFF;
+	const credentialProvider = opts.credentialProvider;
 	let ctx: AdapterContext | null = null;
 
 	return {
@@ -81,6 +90,7 @@ export function createRestAdapter(
 					fetchImpl,
 					sleep,
 					backoff,
+					credentialProvider,
 				),
 			);
 		},
@@ -102,13 +112,22 @@ async function executeWithRetry(
 	fetchImpl: typeof fetch,
 	sleep: (ms: number) => Promise<void>,
 	backoff: number[],
+	credentialProvider: CredentialProvider | undefined,
 ): Promise<NormalizedToolResult> {
 	const maxAttempts =
 		call.policy.retryPolicy === "safe-idempotent" ? backoff.length + 1 : 1;
 	let lastErr: unknown;
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		try {
-			const result = await executeOnce(upstream, ctx, call, fetchImpl, attempt);
+			const result = await executeOnce(
+				upstream,
+				ctx,
+				call,
+				fetchImpl,
+				attempt,
+				credentialProvider,
+				tool,
+			);
 			// Retry on 5xx for safe-idempotent (within attempt budget).
 			if (
 				result.meta?.httpStatus !== undefined &&
@@ -149,9 +168,11 @@ async function executeOnce(
 	call: NormalizedToolCall,
 	fetchImpl: typeof fetch,
 	attempt: number,
+	credentialProvider: CredentialProvider | undefined,
+	tool: Tool,
 ): Promise<NormalizedToolResult> {
 	const tplCtx = { input: call.input, secrets: ctx.secrets };
-	const url = resolveTemplate(upstream.url, tplCtx);
+	let url = resolveTemplate(upstream.url, tplCtx);
 	const headers = resolveTemplate(upstream.headers ?? {}, tplCtx);
 	const bodyValue =
 		upstream.bodyTemplate === undefined
@@ -167,6 +188,29 @@ async function executeOnce(
 	const finalHeaders: Record<string, string> = { ...headers };
 	if (isJsonBody && !hasHeader(finalHeaders, "content-type")) {
 		finalHeaders["content-type"] = "application/json";
+	}
+
+	if (credentialProvider) {
+		let resolved: Awaited<ReturnType<typeof credentialProvider.resolve>>;
+		try {
+			resolved = await credentialProvider.resolve({
+				toolName: call.toolName,
+				correlationId: call.correlationId,
+			});
+		} catch (cause) {
+			if (cause instanceof AuthResolveError) throw cause;
+			throw new AuthResolveError(
+				`auth provider failed for tool '${call.toolName}'`,
+				tool.authProfile ?? "<unknown>",
+				cause,
+			);
+		}
+		for (const [k, v] of Object.entries(resolved.headers)) {
+			finalHeaders[k] = v;
+		}
+		if (resolved.query) {
+			url = appendQuery(url, resolved.query);
+		}
 	}
 
 	const controller = new AbortController();
@@ -218,4 +262,12 @@ async function executeOnce(
 function hasHeader(headers: Record<string, string>, name: string): boolean {
 	const lower = name.toLowerCase();
 	return Object.keys(headers).some((k) => k.toLowerCase() === lower);
+}
+
+function appendQuery(url: string, query: Record<string, string>): string {
+	const u = new URL(url);
+	for (const [k, v] of Object.entries(query)) {
+		u.searchParams.set(k, v);
+	}
+	return u.toString();
 }

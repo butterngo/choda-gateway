@@ -1,0 +1,100 @@
+{
+  "tools": [
+    {
+      "name": "example__list_pets",
+      "description": "List all pets (optionally filtered by status)",
+      "inputSchema": {
+        "properties": {
+          "status": {
+            "enum": [
+              "available",
+              "pending",
+              "sold"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "tags": [
+        "example",
+        "pet"
+      ],
+      "upstream": {
+        "method": "GET",
+        "type": "rest",
+        "url": "https://petstore.example.com/v1/pets"
+      },
+      "concurrency": 8,
+      "timeoutMs": 30000,
+      "retryPolicy": "safe-idempotent",
+      "sideEffecting": false,
+      "authProfile": "example-key"
+    },
+    {
+      "name": "example__create_pet",
+      "description": "Add a new pet to the store",
+      "inputSchema": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "tags": [
+        "example",
+        "pet"
+      ],
+      "upstream": {
+        "bodyTemplate": {
+          "name": "{{input.name}}",
+          "status": "{{input.status}}"
+        },
+        "method": "POST",
+        "type": "rest",
+        "url": "https://petstore.example.com/v1/pets"
+      },
+      "concurrency": 4,
+      "timeoutMs": 10000,
+      "retryPolicy": "none",
+      "sideEffecting": true,
+      "authProfile": "example-key"
+    },
+    {
+      "name": "example__get_pet",
+      "description": "Fetch a pet by id",
+      "inputSchema": {
+        "properties": {
+          "petId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "petId"
+        ],
+        "type": "object"
+      },
+      "tags": [
+        "example",
+        "pet"
+      ],
+      "upstream": {
+        "method": "GET",
+        "type": "rest",
+        "url": "https://petstore.example.com/v1/pets/{{input.petId}}"
+      },
+      "concurrency": 8,
+      "timeoutMs": 30000,
+      "retryPolicy": "safe-idempotent",
+      "sideEffecting": false,
+      "authProfile": "example-key"
+    }
+  ]
+}

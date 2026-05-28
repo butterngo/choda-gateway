@@ -1,0 +1,75 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.0.0
+  description: Tiny pet inventory.
+servers:
+  - url: https://api.petstore.example/v1
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      tags: [pet]
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+    post:
+      operationId: createPet
+      summary: Create a pet
+      tags: [pet]
+      x-choda-timeout-ms: 5000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "201":
+          description: created
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getPet
+      summary: Get pet by id
+      tags: [pet]
+      responses:
+        "200":
+          description: ok
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

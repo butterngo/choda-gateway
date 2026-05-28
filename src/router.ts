@@ -1,6 +1,7 @@
 import { Ajv, type ValidateFunction } from "ajv";
 import type { AuditLogger } from "./audit/logger.js";
 import type { AuditEntry, UpstreamType } from "./audit/types.js";
+import type { CredentialProvider } from "./auth/types.js";
 import type { Tool } from "./manifest/types.js";
 import type { SecretStore } from "./secrets/store.js";
 import type {
@@ -48,6 +49,12 @@ export interface RouterOptions {
 	 * Override the adapter factory for tests. Defaults to `createAdapter`.
 	 */
 	adapterFactory?: RouterAdapterFactory;
+	/**
+	 * Auth-profile registry from `loadProfiles` + `createProviderRegistry`.
+	 * Forwarded to `createAdapter` so REST tools with `authProfile` resolve a
+	 * `CredentialProvider` per call. Tools without `authProfile` are unaffected.
+	 */
+	credentialProviders?: ReadonlyMap<string, CredentialProvider>;
 }
 
 export interface ToolListItem {
@@ -101,7 +108,10 @@ function walkStrings(value: unknown, cb: (s: string) => void): void {
 }
 
 export async function createRouter(opts: RouterOptions): Promise<Router> {
-	const factory: RouterAdapterFactory = opts.adapterFactory ?? createAdapter;
+	const factory: RouterAdapterFactory =
+		opts.adapterFactory ??
+		((tool) =>
+			createAdapter(tool, { credentialProviders: opts.credentialProviders }));
 	const logger = opts.logger ?? NOOP_LOGGER;
 	const ajv = new Ajv({ allErrors: true, strict: false });
 	const compiled = new Map<string, CompiledTool>();

@@ -1,3 +1,4 @@
+import type { CredentialProvider } from "../auth/types.js";
 import type { Tool } from "../manifest/types.js";
 import type { UpstreamAdapter } from "../types.js";
 import { createCliAdapter } from "./cli-adapter.js";
@@ -19,6 +20,13 @@ export type {
 export interface CreateAdapterOptions {
 	mcp?: McpAdapterOptions;
 	rest?: RestAdapterOptions;
+	/**
+	 * Registry keyed by `tool.authProfile`. When `tool.authProfile` resolves to
+	 * a provider here, the REST adapter awaits it per call and merges the
+	 * resulting headers + query into the outbound request. Tools without
+	 * `authProfile` behave exactly as before.
+	 */
+	credentialProviders?: ReadonlyMap<string, CredentialProvider>;
 }
 
 /**
@@ -32,8 +40,15 @@ export function createAdapter(
 	switch (tool.upstream.type) {
 		case "mcp":
 			return createMcpAdapter(tool, opts.mcp);
-		case "rest":
-			return createRestAdapter(tool, opts.rest);
+		case "rest": {
+			const provider = tool.authProfile
+				? opts.credentialProviders?.get(tool.authProfile)
+				: undefined;
+			return createRestAdapter(tool, {
+				...opts.rest,
+				credentialProvider: provider,
+			});
+		}
 		case "cli":
 			return createCliAdapter(tool);
 	}

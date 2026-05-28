@@ -3,6 +3,7 @@ import { z } from "zod";
 const NAME_PATTERN =
 	/^[a-z0-9]([a-z0-9_-]{0,30}[a-z0-9])?__[a-z0-9][a-z0-9_]{0,62}[a-z0-9]$/;
 const TAG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
+const AUTH_PROFILE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 const ToolName = z
 	.string()
@@ -13,6 +14,14 @@ const Tag = z
 	.string()
 	.max(64)
 	.regex(TAG_PATTERN, "tag must be lowercase alphanumeric + dash");
+
+const AuthProfileName = z
+	.string()
+	.max(64)
+	.regex(
+		AUTH_PROFILE_PATTERN,
+		"authProfile must match ^[a-z0-9][a-z0-9_-]{0,63}$",
+	);
 
 const UpstreamMcp = z.object({
 	type: z.literal("mcp"),
@@ -55,6 +64,7 @@ export const ToolSchema = z
 		timeoutMs: z.number().int().min(1).max(600_000),
 		retryPolicy: z.enum(["none", "safe-idempotent"]),
 		sideEffecting: z.boolean(),
+		authProfile: AuthProfileName.optional(),
 	})
 	.superRefine((tool, ctx) => {
 		if (tool.upstream.type === "cli") {
@@ -84,11 +94,13 @@ export const ToolsManifestSchema = z.object({
 export const GatewayConfigSchema = z.object({
 	toolsPath: z.string().min(1),
 	auditPath: z.string().min(1),
+	authProfilesPath: z.string().min(1).optional(),
 	secrets: z
 		.object({
 			source: z.enum(["env", "file"]).default("env"),
 		})
 		.optional(),
+	paths: z.record(z.string(), z.string().min(1)).optional(),
 	profiles: z
 		.record(z.string(), z.array(Tag).min(1))
 		.refine((profiles) => Object.keys(profiles).length > 0, {
