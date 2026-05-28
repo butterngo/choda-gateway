@@ -1,6 +1,6 @@
 # choda-gateway
 
-> Status: **Phase-1** implementation in progress.
+> One MCP stdio server, many upstreams. CI: Ubuntu + Windows.
 
 ## What it is
 
@@ -27,20 +27,29 @@ See [ADR-002](docs/knowledge/ADR-002-tag-profile-tool-exposure.md) for the profi
 ## Quick start
 
 ```powershell
-# Setup (Phase-0 verified — these 4 steps work today)
+# 1. Install
 corepack enable                # if EPERM on Windows: run in elevated shell, or skip if pnpm is already on PATH
 pnpm install
+
+# 2. Copy the example config + manifest
 Copy-Item gateway.config.example.yaml gateway.config.yaml
 Copy-Item tools.example.json tools.json
 
-# Phase-1 (deferred — CLI binary lands in TASK-696):
-# pnpm build
-# node dist/cli.js start --profile=coding
-#
-# Then add .vscode/mcp.json (see "How to attach" below) and reload VS Code.
+# 3. Build the CLI bundle
+pnpm build
+
+# 4. (Optional, if any tool uses {{secrets.X}}) — init + set the encrypted store
+$env:GATEWAY_SECRETS_PASSWORD = "choose-a-strong-passphrase"
+node dist/cli.js secrets set LINEAR_API_KEY --value="lin_api_xxx"
+
+# 5. Sanity-check what tools will be exposed
+node dist/cli.js tools list --profile=coding
+
+# 6. Start the gateway (stdio MCP server — Claude Code / VS Code attaches to it)
+node dist/cli.js start --profile=coding
 ```
 
-**Secret loading:** Phase-1 will resolve `{{secrets.X}}` placeholders. The libsodium-backed encrypted store (TASK-692) is deferred to Phase 2 — local-only use does not warrant the complexity. Phase-1 reads secrets from `process.env`; the strategy will be finalised in TASK-694.
+**Secrets:** any string in `tools.json` matching `{{secrets.KEYNAME}}` is resolved from `secrets.enc` at request time. The store is encrypted with libsodium (Argon2id + XChaCha20-Poly1305); the password lives in `GATEWAY_SECRETS_PASSWORD` for the lifetime of the gateway process. Use `node dist/cli.js secrets {list|set|rm}` to manage entries. If the gateway can't find a secret a tool references, it fails fast at startup.
 
 ## Minimal config
 
@@ -83,24 +92,39 @@ When you edit `tools.json` and the new tool doesn't show up in Copilot Chat:
 
 The gateway also implements a `SIGHUP` reload as a dev convenience, but client UIs do not refresh on `notifications/tools/list_changed`, so the official refresh path is restart + reset. See [ADR-003](docs/knowledge/ADR-003-manifest-reload-contract.md).
 
-## Dev commands + current limitations
+## CLI reference
 
-```powershell
-pnpm test          # vitest unit + integration suites
-pnpm build         # tsup -> dist/
-pnpm lint          # biome
-# pnpm secrets ... # Phase-1 (TASK-694) — strategy TBD, see Quick start
+```
+choda-gateway start          [--profile=<name>] [--config=<path>]
+choda-gateway tools list     [--profile=<name>] [--config=<path>]
+choda-gateway secrets list   [--config=<path>]
+choda-gateway secrets set <NAME>  [--value=<val>]  [--config=<path>]   # value via stdin if --value omitted
+choda-gateway secrets rm  <NAME>  [--config=<path>]
+choda-gateway ingest <spec>  --group=<name>  [--auth-profile=<name>]
+                             [--out=<path>]  [--base-url=<url>]  [--check]
 ```
 
-Current limitations (Phase-0/1 MVP scope):
+Env:
 
-- **HTTP downstream not implemented** — only stdio MCP downstream is supported. Gemini and other non-MCP clients are deferred to Phase 2 (revisit when needed; see ADR-001).
-- **Tested on Windows only.** Validated on Windows 11 + Node 22; Linux signal-payload parity is deferred to Phase-1 CI.
+- `GATEWAY_SECRETS_PASSWORD` — password for the libsodium store. Required when any tool references `{{secrets.X}}`.
+- `GATEWAY_PROFILE` — fallback when `--profile` is omitted.
+
+## Dev commands
+
+```powershell
+pnpm test          # vitest unit + integration suites (Ubuntu + Windows in CI)
+pnpm build         # tsup -> dist/cli.js
+pnpm lint          # biome
+pnpm format        # biome --write
+```
+
+## Current limitations
+
+- **No HTTP downstream client.** The gateway speaks stdio MCP to its clients (Claude Code, Claude Desktop, Copilot Chat). HTTP/SSE client transports are out of scope — see [ADR-001](docs/knowledge/ADR-001-architecture-overview.md).
 - **No auth.** The gateway trusts its local process boundary; multi-user / RBAC is out of scope.
-- **No log rotation.** Audit JSONL grows unbounded — rotation is Phase 2.
-- **No encrypted secret store.** Phase-1 reads from `process.env`. See "Quick start" for the deferral rationale.
-
-For supervisor strategy (restart vs fail-closed on upstream crash, keyed off `sideEffecting`), ADR-006 will formalise it once Phase-1 lands the supervisor module.
+- **No log rotation.** Audit JSONL at `auditPath` grows unbounded — rotate externally or wipe periodically.
+- **Cross-process secret-store contention.** Running `choda-gateway secrets set` from two terminals concurrently could race the encrypted store. In-process parallel writes are now safe (TASK-976) but cross-process needs filesystem locking — not yet implemented.
+- **Single MCP transport.** stdio only. SSE/WebSocket transports follow the same adapter shape but aren't wired.
 
 ## OpenAPI ingestion + credential profiles
 
