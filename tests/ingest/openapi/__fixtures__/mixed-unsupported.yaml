@@ -1,0 +1,52 @@
+openapi: 3.0.0
+info:
+  title: Mixed
+  version: 1.0.0
+paths:
+  /upload:
+    post:
+      operationId: upload
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200": { description: ok }
+  /good:
+    get:
+      operationId: good
+      responses:
+        "200": { description: ok }
+  /remote:
+    get:
+      operationId: remote
+      parameters:
+        - $ref: "https://example.com/parameters.yaml#/RemoteParam"
+      responses:
+        "200": { description: ok }
+  /cookie-param:
+    get:
+      operationId: cookieParam
+      parameters:
+        - name: sid
+          in: cookie
+          schema: { type: string }
+      responses:
+        "200": { description: ok }
+  /callback-op:
+    post:
+      operationId: cbop
+      callbacks:
+        onEvent:
+          "{$request.body#/callbackUrl}":
+            post:
+              responses:
+                "200": { description: cb }
+      responses:
+        "200": { description: ok }
