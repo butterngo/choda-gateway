@@ -5,7 +5,7 @@ import {
 	scryptSync,
 } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { DecryptError, SecretMissingError } from "./errors.js";
 import {
 	HEADER_FIXED_END,
@@ -194,11 +194,15 @@ export async function setFallbackSecret(
 		nonce: nonce.toString("base64"),
 		ct: ct.toString("base64"),
 	})}\n`;
-	// Serialise the final append so parallel setFallbackSecret calls on the
-	// same store can't race the file pointer (Windows NTFS — TASK-976).
-	await withStoreWriteLock(opts.storePath, () =>
-		appendFile(opts.storePath, line),
-	);
+	// Read-then-writeFile under the lock — same approach as setSecret;
+	// avoids unreliable fs.appendFile on Windows NTFS (TASK-976).
+	await withStoreWriteLock(opts.storePath, async () => {
+		const existing = await readFile(opts.storePath);
+		await writeFile(
+			opts.storePath,
+			Buffer.concat([existing, Buffer.from(line, "utf8")]),
+		);
+	});
 }
 
 export interface FallbackOpenOptions {

@@ -3,40 +3,70 @@ import { resolve as resolvePath } from "node:path";
 /**
  * Per-store write serialisation.
  *
- * Why this exists: `setSecret` (libsodium) and `setFallbackSecret` (node:crypto)
- * end with `appendFile(storePath, line)`. On Windows NTFS, `fs/promises.appendFile`
- * is NOT atomic across parallel awaits — concurrent calls can race on the file
- * pointer and either interleave bytes or drop a write. The symptom seen in CI
- * (TASK-976) was 9 lines in a file where 8 were expected.
+ * Why this exists: parallel `setSecret` (libsodium) or `setFallbackSecret`
+ * (node:crypto) calls on the same store would race on the final write to
+ * disk. On Windows NTFS, `fs.appendFile` was observed to lose or duplicate
+ * lines under contention (TASK-976). Even `readFile + writeFile` is not safe
+ * without serialisation — concurrent callers would each read the same
+ * pre-state and last writer wins.
  *
- * Fix: chain writes for the same store through a per-path Promise queue. Each
- * call awaits its predecessor before running, so the critical section (read
- * header → derive key → append entry) executes sequentially per `storePath`.
+ * Fix: a per-store async mutex. Each call waits for its predecessor before
+ * running, so the critical section (read header → derive key → read existing
+ * bytes → writeFile) executes sequentially per `storePath`.
  *
- * In-process scope: this lock is per Node.js process. Two terminals running
- * `choda-gateway secrets set` in parallel would still race; that needs a
- * filesystem lock (flock / `proper-lockfile`) and is out of scope here — the
- * test flake we are fixing is single-process parallel writes.
- *
- * Failures do not break the chain: a rejected task lets the next caller run
- * its own task fresh.
+ * In-process scope: this lock is per Node.js process. Cross-process
+ * coordination (two terminals running `choda-gateway secrets set` in
+ * parallel) would need a filesystem lock (`flock` / `proper-lockfile`) and
+ * is out of scope here — we are fixing the test flake from single-process
+ * parallel writes.
  */
 
-const writeLocks = new Map<string, Promise<unknown>>();
+class AsyncMutex {
+	private locked = false;
+	private waiters: Array<() => void> = [];
+
+	async run<T>(fn: () => Promise<T>): Promise<T> {
+		await this.acquire();
+		try {
+			return await fn();
+		} finally {
+			this.release();
+		}
+	}
+
+	private acquire(): Promise<void> {
+		if (!this.locked) {
+			this.locked = true;
+			return Promise.resolve();
+		}
+		return new Promise<void>((resolve) => {
+			this.waiters.push(resolve);
+		});
+	}
+
+	private release(): void {
+		const next = this.waiters.shift();
+		if (next) {
+			// Hand off the lock atomically — `locked` stays true so a new caller
+			// can't squeeze in between release() and the awakened next runner.
+			next();
+		} else {
+			this.locked = false;
+		}
+	}
+}
+
+const mutexes = new Map<string, AsyncMutex>();
 
 export function withStoreWriteLock<T>(
 	storePath: string,
 	fn: () => Promise<T>,
 ): Promise<T> {
 	const key = resolvePath(storePath);
-	const previous = writeLocks.get(key) ?? Promise.resolve();
-	// `.then(fn, fn)` runs fn whether previous resolved or rejected — we don't
-	// want one caller's failure to skip the next caller's work.
-	const next = previous.then(fn, fn);
-	// Park a swallowed copy so the next chain link doesn't see the rejection.
-	writeLocks.set(
-		key,
-		next.catch(() => undefined),
-	);
-	return next;
+	let m = mutexes.get(key);
+	if (!m) {
+		m = new AsyncMutex();
+		mutexes.set(key, m);
+	}
+	return m.run(fn);
 }

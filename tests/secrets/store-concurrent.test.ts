@@ -2,11 +2,27 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { HEADER_FIXED_END } from "../../src/secrets/header.js";
 import {
 	initSecretStore,
 	openSecretStore,
 	setSecret,
 } from "../../src/secrets/store.js";
+
+/**
+ * Extract entry lines from a libsodium secret store buffer, ignoring the
+ * fixed-length binary header. We cannot just `text.split("\n").slice(1)`
+ * because the header's salt (16 random bytes) and KDF params can contain
+ * 0x0A bytes — this caused TASK-976 flakes when run on real-random salts.
+ * The header is exactly HEADER_FIXED_END bytes plus a trailing 0x0A.
+ */
+async function readEntryLines(storePath: string): Promise<string[]> {
+	const buf = await readFile(storePath);
+	let pos = HEADER_FIXED_END;
+	if (buf[pos] === 0x0a) pos++;
+	const tail = buf.subarray(pos).toString("utf8");
+	return tail.split("\n").filter((l) => l.trim().length > 0);
+}
 
 const PASSWORD = "concurrent-pw";
 
@@ -49,11 +65,7 @@ describe("secret store — concurrency", () => {
 		}
 
 		// Every entry line should parse as JSON with the three expected fields.
-		const raw = await readFile(storePath, "utf8");
-		const entryLines = raw
-			.split("\n")
-			.slice(1) // header line
-			.filter((l) => l.trim().length > 0);
+		const entryLines = await readEntryLines(storePath);
 		expect(entryLines).toHaveLength(names.length);
 		for (const line of entryLines) {
 			const parsed = JSON.parse(line);
@@ -94,11 +106,7 @@ describe("secret store — concurrency", () => {
 				);
 				written += PER_ROUND;
 
-				const raw = await readFile(storePath, "utf8");
-				const entryLines = raw
-					.split("\n")
-					.slice(1)
-					.filter((l) => l.trim().length > 0);
+				const entryLines = await readEntryLines(storePath);
 				expect(entryLines).toHaveLength(written);
 				// Every line is well-formed JSON with the entry shape.
 				for (const line of entryLines) {
