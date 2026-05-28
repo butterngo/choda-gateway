@@ -32,16 +32,25 @@ describe("createProvider — dispatch", () => {
 		).toThrow(/saml-magic/);
 	});
 
-	it("not-yet-implemented providers (oauth2-cc/cookie-jar/exec-script) throw until their task lands", () => {
+	it("dispatches oauth2-cc", () => {
+		const p = createProvider({
+			type: "oauth2-cc",
+			tokenUrl: "https://x/t",
+			clientId: "a",
+			clientSecret: "b",
+			clientAuth: "basic",
+		});
+		expect(p.type).toBe("oauth2-cc");
+	});
+
+	it("not-yet-implemented providers (cookie-jar/exec-script) throw until their task lands", () => {
 		expect(() =>
 			createProvider({
-				type: "oauth2-cc",
-				tokenUrl: "https://x/t",
-				clientId: "a",
-				clientSecret: "b",
-				clientAuth: "basic",
+				type: "cookie-jar",
+				cookieFile: "/tmp/c",
+				forwardHeaders: ["cookie"],
 			}),
-		).toThrow(/oauth2-cc/);
+		).toThrow(/cookie-jar/);
 	});
 });
 

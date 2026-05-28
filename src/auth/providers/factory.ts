@@ -5,6 +5,7 @@ import {
 } from "../types.js";
 import { createApiKeyProvider } from "./api-key.js";
 import { createBearerStaticProvider } from "./bearer-static.js";
+import { createOAuth2CcProvider } from "./oauth2-cc.js";
 
 /**
  * Build a `CredentialProvider` from a validated `AuthProfile`. Dispatch is on
@@ -23,6 +24,8 @@ export function createProvider(
 			return createBearerStaticProvider(profile);
 		case "api-key":
 			return createApiKeyProvider(profile);
+		case "oauth2-cc":
+			return createOAuth2CcProvider(profile, { profileName });
 		default: {
 			// Provider types declared in the schema but not yet wired.
 			const t = (profile as { type: string }).type;
