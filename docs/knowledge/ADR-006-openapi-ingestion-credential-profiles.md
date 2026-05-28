@@ -7,7 +7,26 @@ scope: project
 refs: []
 createdAt: 2026-05-28
 lastVerifiedAt: 2026-05-28
+status: implemented
 ---
+
+## Status
+
+**Implemented (2026-05-28).** Lands in `feat/task-970-openapi-ingestion-credential-profiles`:
+
+- Manifest schema + `auth-profiles.yaml` loader (`src/auth/`, `src/manifest/`).
+- 5 credential providers: `bearer-static`, `api-key`, `oauth2-cc`,
+  `cookie-jar`, `exec-script` (`src/auth/providers/`).
+- REST adapter resolves `CredentialProvider` per call (`src/upstream/rest-adapter.ts`).
+- OpenAPI 3.0/3.1 parser + transform + `choda-gateway ingest` CLI with
+  `--check` drift detection (`src/ingest/`).
+- Manifest fragment merge from `tools/*.json` at startup (`src/manifest/loader.ts`).
+- Walkthrough + example spec + example profiles (`examples/`, README).
+
+End-to-end smoke verified via the committed `examples/tools/example.petstore.json`
+which `ingest --check` confirms is up to date against `examples/openapi/petstore.yaml`.
+Calling a tool via MCP from Claude Code requires a real upstream HTTP server
++ secrets in `secrets.enc` — left to the operator at first real use.
 
 ## Context
 
