@@ -20,7 +20,7 @@ See [ADR-002](docs/knowledge/ADR-002-tag-profile-tool-exposure.md) for the profi
 
 ## Requirements
 
-- Node.js **22.19.0** (LTS) — pinned in `.nvmrc` / `engines`
+- Node.js **24.14.0** (LTS) — pinned in `.nvmrc` / `engines`
 - pnpm **10.33.0** via `corepack enable`
 - VS Code **1.100+** (Copilot Chat MCP support)
 
