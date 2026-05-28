@@ -5,6 +5,7 @@ import {
 } from "../types.js";
 import { createApiKeyProvider } from "./api-key.js";
 import { createBearerStaticProvider } from "./bearer-static.js";
+import { createCookieJarProvider } from "./cookie-jar.js";
 import { createOAuth2CcProvider } from "./oauth2-cc.js";
 
 /**
@@ -26,6 +27,8 @@ export function createProvider(
 			return createApiKeyProvider(profile);
 		case "oauth2-cc":
 			return createOAuth2CcProvider(profile, { profileName });
+		case "cookie-jar":
+			return createCookieJarProvider(profile, { profileName });
 		default: {
 			// Provider types declared in the schema but not yet wired.
 			const t = (profile as { type: string }).type;

@@ -43,14 +43,25 @@ describe("createProvider — dispatch", () => {
 		expect(p.type).toBe("oauth2-cc");
 	});
 
-	it("not-yet-implemented providers (cookie-jar/exec-script) throw until their task lands", () => {
+	it("dispatches cookie-jar", () => {
+		const p = createProvider({
+			type: "cookie-jar",
+			cookieFile: "/tmp/c",
+			forwardHeaders: ["cookie"],
+		});
+		expect(p.type).toBe("cookie-jar");
+	});
+
+	it("not-yet-implemented providers (exec-script) throw until their task lands", () => {
 		expect(() =>
 			createProvider({
-				type: "cookie-jar",
-				cookieFile: "/tmp/c",
-				forwardHeaders: ["cookie"],
+				type: "exec-script",
+				command: ["true"],
+				cacheTtlSeconds: 60,
+				parseOutputAs: "raw",
+				timeoutMs: 30_000,
 			}),
-		).toThrow(/cookie-jar/);
+		).toThrow(/exec-script/);
 	});
 });
 
