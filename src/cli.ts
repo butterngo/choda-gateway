@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { createAuditLogger } from "./audit/logger.js";
 import { buildMcpServer, startStdioServer } from "./index.js";
+import { runIngest } from "./ingest/cli.js";
 import { loadGatewayConfig, loadToolsManifest } from "./manifest/loader.js";
 import {
 	filterToolsByProfile,
@@ -26,6 +27,11 @@ interface ParsedCli {
 		config?: string;
 		help?: boolean;
 		value?: string;
+		group?: string;
+		"auth-profile"?: string;
+		out?: string;
+		"base-url"?: string;
+		check?: boolean;
 	};
 	positionals: string[];
 }
@@ -38,6 +44,11 @@ function parseCli(argv: string[]): ParsedCli {
 			config: { type: "string" },
 			value: { type: "string" },
 			help: { type: "boolean", short: "h" },
+			group: { type: "string" },
+			"auth-profile": { type: "string" },
+			out: { type: "string" },
+			"base-url": { type: "string" },
+			check: { type: "boolean" },
 		},
 		allowPositionals: true,
 		strict: true,
@@ -55,6 +66,15 @@ function printHelp(): void {
 			"  choda-gateway secrets list [--config=<path>]",
 			"  choda-gateway secrets set <NAME> [--value=<val>] [--config=<path>]",
 			"  choda-gateway secrets rm <NAME> [--config=<path>]",
+			"  choda-gateway ingest <spec> --group=<name> [--auth-profile=<name>]",
+			"                         [--out=<path>] [--base-url=<url>] [--check]",
+			"",
+			"Ingest (OpenAPI → manifest fragment):",
+			"  Supported methods : GET POST PUT PATCH DELETE",
+			"  Body content type : application/json (multipart/binary skipped + warned)",
+			"  Parameters        : path, query, header (cookie params dropped)",
+			"  $ref              : local refs only; remote $ref → operation skipped",
+			"  Skipped + warned  : callbacks, webhooks, streaming response types",
 			"",
 			"Environment:",
 			`  ${PASSWORD_ENV} — password for the libsodium secret store`,
@@ -296,9 +316,27 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 				default:
 					throw new Error(`unknown secrets sub: ${rest[0]}`);
 			}
+		case "ingest":
+			await cmdIngest(cli, rest[0]);
+			return;
 		default:
 			throw new Error(`unknown command: ${cmd}`);
 	}
+}
+
+async function cmdIngest(cli: ParsedCli, specPath: string): Promise<void> {
+	if (!specPath) throw new Error("ingest: spec path required");
+	const group = cli.values.group;
+	if (!group) throw new Error("ingest: --group=<name> required");
+	const result = await runIngest({
+		specPath,
+		group,
+		authProfile: cli.values["auth-profile"],
+		outPath: cli.values.out,
+		baseUrl: cli.values["base-url"],
+		check: cli.values.check,
+	});
+	if (result.exitCode !== 0) process.exit(result.exitCode);
 }
 
 const invokedDirectly = (() => {
