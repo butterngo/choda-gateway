@@ -13,6 +13,7 @@ import {
 	SALT_BYTES,
 	parseEntries,
 } from "./header.js";
+import { withStoreWriteLock } from "./locks.js";
 
 /**
  * Explicit-opt-in fallback secret store. Same on-disk shape as the libsodium
@@ -193,7 +194,11 @@ export async function setFallbackSecret(
 		nonce: nonce.toString("base64"),
 		ct: ct.toString("base64"),
 	})}\n`;
-	await appendFile(opts.storePath, line);
+	// Serialise the final append so parallel setFallbackSecret calls on the
+	// same store can't race the file pointer (Windows NTFS — TASK-976).
+	await withStoreWriteLock(opts.storePath, () =>
+		appendFile(opts.storePath, line),
+	);
 }
 
 export interface FallbackOpenOptions {

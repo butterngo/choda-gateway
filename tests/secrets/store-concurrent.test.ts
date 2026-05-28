@@ -63,6 +63,69 @@ describe("secret store — concurrency", () => {
 		}
 	});
 
+	// Regression for TASK-976 — appendFile races on Windows NTFS would
+	// intermittently produce off-by-one entry counts under parallel writes.
+	// Loop a moderate-concurrency batch 4× and demand exact line counts each
+	// round; without the per-store write lock this fails deterministically on
+	// Windows. Timeout is generous because the write lock now serialises
+	// Argon2id-backed setSecret calls (~50ms each on CI hosts).
+	it(
+		"repeated high-concurrency parallel setSecret never produces stray lines (TASK-976 regression)",
+		{ timeout: 30_000 },
+		async () => {
+			await initSecretStore({ storePath });
+			const ROUNDS = 4;
+			const PER_ROUND = 12;
+			let written = 0;
+			for (let round = 0; round < ROUNDS; round++) {
+				const names = Array.from(
+					{ length: PER_ROUND },
+					(_, i) => `R${round}_K${i}`,
+				);
+				await Promise.all(
+					names.map((n) =>
+						setSecret({
+							storePath,
+							password: PASSWORD,
+							name: n,
+							value: `val-${n}`,
+						}),
+					),
+				);
+				written += PER_ROUND;
+
+				const raw = await readFile(storePath, "utf8");
+				const entryLines = raw
+					.split("\n")
+					.slice(1)
+					.filter((l) => l.trim().length > 0);
+				expect(entryLines).toHaveLength(written);
+				// Every line is well-formed JSON with the entry shape.
+				for (const line of entryLines) {
+					const parsed = JSON.parse(line);
+					expect(parsed).toHaveProperty("name");
+					expect(parsed).toHaveProperty("nonce");
+					expect(parsed).toHaveProperty("ct");
+				}
+			}
+
+			// And every secret round-trips through the cipher.
+			const all = Array.from({ length: ROUNDS * PER_ROUND }, (_, idx) => {
+				const round = Math.floor(idx / PER_ROUND);
+				const k = idx % PER_ROUND;
+				return `R${round}_K${k}`;
+			});
+			const store = await openSecretStore({
+				storePath,
+				password: PASSWORD,
+				required: all,
+			});
+			for (const n of all) {
+				await expect(store.get(n)).resolves.toBe(`val-${n}`);
+			}
+		},
+	);
+
 	it("setSecret + later overwriting setSecret of the same name resolves to the latest value", async () => {
 		await initSecretStore({ storePath });
 		await setSecret({ storePath, password: PASSWORD, name: "K", value: "old" });
