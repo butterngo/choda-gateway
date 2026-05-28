@@ -5,7 +5,19 @@ import { ManifestError } from "./errors.js";
 import { GatewayConfigSchema, ToolsManifestSchema } from "./schema.js";
 import type { GatewayConfig, ToolsManifest } from "./types.js";
 
-export async function loadToolsManifest(path: string): Promise<ToolsManifest> {
+export interface LoadToolsManifestOptions {
+	/**
+	 * When provided, every tool entry that declares `authProfile` is checked
+	 * against this set; unknown profiles throw `ManifestError` naming both the
+	 * tool and the missing profile. Pass `undefined` to skip cross-validation.
+	 */
+	knownProfiles?: ReadonlySet<string>;
+}
+
+export async function loadToolsManifest(
+	path: string,
+	opts: LoadToolsManifestOptions = {},
+): Promise<ToolsManifest> {
 	const raw = await readFileOrThrow(path);
 	let parsed: unknown;
 	try {
@@ -21,7 +33,27 @@ export async function loadToolsManifest(path: string): Promise<ToolsManifest> {
 		);
 	}
 	assertUniqueNames(result.data);
+	if (opts.knownProfiles) {
+		assertAuthProfilesReferenced(result.data, opts.knownProfiles);
+	}
 	return result.data;
+}
+
+export function assertAuthProfilesReferenced(
+	manifest: ToolsManifest,
+	knownProfiles: ReadonlySet<string>,
+): void {
+	const missing: string[] = [];
+	for (const tool of manifest.tools) {
+		if (tool.authProfile && !knownProfiles.has(tool.authProfile)) {
+			missing.push(`${tool.name} -> ${tool.authProfile}`);
+		}
+	}
+	if (missing.length > 0) {
+		throw new ManifestError(
+			`tool(s) reference unknown auth profile(s): ${missing.join("; ")}`,
+		);
+	}
 }
 
 export async function loadGatewayConfig(path: string): Promise<{
