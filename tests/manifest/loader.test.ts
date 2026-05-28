@@ -175,6 +175,84 @@ describe("loadToolsManifest — authProfile cross-validation", () => {
 	});
 });
 
+describe("loadToolsManifest — fragment merge", () => {
+	it("loads + merges multiple *.json fragments in alphabetical order", async () => {
+		await writeManifest(
+			"01-a.json",
+			makeManifest([makeMcpTool({ name: "alpha__aa" })]),
+		);
+		await writeManifest(
+			"02-b.json",
+			makeManifest([makeRestTool({ name: "beta__bb" })]),
+		);
+		await writeManifest(
+			"03-c.json",
+			makeManifest([makeCliTool({ name: "gamma__cc" })]),
+		);
+		const manifest = await loadToolsManifest(dir);
+		expect(manifest.tools.map((t) => t.name)).toEqual([
+			"alpha__aa",
+			"beta__bb",
+			"gamma__cc",
+		]);
+	});
+
+	it("duplicate tool name across fragments → ManifestError naming both files", async () => {
+		await writeManifest(
+			"a.json",
+			makeManifest([makeRestTool({ name: "same__name" })]),
+		);
+		await writeManifest(
+			"b.json",
+			makeManifest([makeMcpTool({ name: "same__name" })]),
+		);
+		await expect(loadToolsManifest(dir)).rejects.toThrow(
+			/duplicate tool name across fragments/,
+		);
+		await expect(loadToolsManifest(dir)).rejects.toThrow(/a\.json/);
+		await expect(loadToolsManifest(dir)).rejects.toThrow(/b\.json/);
+	});
+
+	it("ignores non-.json files in the directory", async () => {
+		await writeManifest("a.json", makeManifest([makeMcpTool()]));
+		await writeFile(join(dir, "README.md"), "ignored", "utf8");
+		await writeFile(join(dir, "scratch.txt"), "ignored", "utf8");
+		const manifest = await loadToolsManifest(dir);
+		expect(manifest.tools).toHaveLength(1);
+	});
+
+	it("empty directory → ManifestError", async () => {
+		await expect(loadToolsManifest(dir)).rejects.toThrow(/no tools loaded/);
+	});
+
+	it("single-file path still works (regression)", async () => {
+		const path = await writeManifest(
+			"tools.json",
+			makeManifest([makeRestTool()]),
+		);
+		const manifest = await loadToolsManifest(path);
+		expect(manifest.tools).toHaveLength(1);
+	});
+
+	it("authProfile cross-validation applies across the merged set", async () => {
+		await writeManifest(
+			"01.json",
+			makeManifest([
+				makeRestTool({ name: "ichiba__alpha", authProfile: "ichiba-prod" }),
+			]),
+		);
+		await writeManifest(
+			"02.json",
+			makeManifest([
+				makeRestTool({ name: "mantu__beta", authProfile: "mantu-dev" }),
+			]),
+		);
+		await expect(
+			loadToolsManifest(dir, { knownProfiles: new Set(["ichiba-prod"]) }),
+		).rejects.toThrow(/mantu__beta -> mantu-dev/);
+	});
+});
+
 describe("loadGatewayConfig — paths + authProfilesPath", () => {
 	async function writeYaml(name: string, body: string): Promise<string> {
 		const p = join(dir, name);
