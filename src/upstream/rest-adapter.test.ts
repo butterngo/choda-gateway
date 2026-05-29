@@ -275,6 +275,83 @@ describe("rest-adapter", () => {
 	});
 });
 
+describe("rest-adapter — error content surfacing", () => {
+	it("surfaces status line on a 401 with empty body", async () => {
+		handle = await startServer(() => ({ status: 401, body: "" }));
+		const adapter = createRestAdapter(
+			makeTool({
+				retryPolicy: "none",
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+			}),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(
+			makeCall({ policy: { ...makeCall().policy, retryPolicy: "none" } }),
+		);
+		expect(r.content[0]).toEqual({
+			type: "text",
+			text: "HTTP 401 Unauthorized",
+		});
+		expect(r.isError).toBe(true);
+		expect(r.meta?.httpStatus).toBe(401);
+		await adapter.dispose();
+	});
+
+	it("prefixes the status line and preserves a non-empty body", async () => {
+		handle = await startServer(() => ({
+			status: 500,
+			body: '{"error":"boom"}',
+		}));
+		const adapter = createRestAdapter(
+			makeTool({
+				retryPolicy: "none",
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+			}),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(
+			makeCall({ policy: { ...makeCall().policy, retryPolicy: "none" } }),
+		);
+		expect(r.content[0]).toEqual({
+			type: "text",
+			text: 'HTTP 500 Internal Server Error\n{"error":"boom"}',
+		});
+		expect(r.isError).toBe(true);
+		expect(r.meta?.httpStatus).toBe(500);
+		await adapter.dispose();
+	});
+
+	it("leaves a 2xx empty body untouched (no status line, not isError)", async () => {
+		handle = await startServer(() => ({ status: 200, body: "" }));
+		const adapter = createRestAdapter(
+			makeTool({
+				upstream: {
+					type: "rest",
+					method: "GET",
+					url: `http://127.0.0.1:${handle.port}/q`,
+				},
+			}),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(r.content[0]).toEqual({ type: "text", text: "" });
+		expect(r.isError).toBeUndefined();
+		expect(r.meta?.httpStatus).toBe(200);
+		await adapter.dispose();
+	});
+});
+
 describe("rest-adapter — credential provider integration", () => {
 	it("merges provider-resolved headers into the outbound request", async () => {
 		handle = await startServer(() => ({ status: 200, body: '{"ok":true}' }));
