@@ -355,8 +355,7 @@ function describeUpstream(tool: Tool): string {
 function classifyResultError(result: NormalizedToolResult): string {
 	if (result.meta?.httpStatus !== undefined) {
 		const s = result.meta.httpStatus;
-		if (s >= 500) return "http_5xx";
-		if (s >= 400) return "http_4xx";
+		if (s >= 400) return `http_${s}`;
 	}
 	if (result.meta?.exitCode !== undefined && result.meta.exitCode !== 0) {
 		return "cli_nonzero_exit";

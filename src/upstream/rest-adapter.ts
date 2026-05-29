@@ -248,7 +248,14 @@ async function executeOnce(
 	const httpStatus = response.status;
 	const ok = response.ok;
 	const result: NormalizedToolResult = {
-		content: [{ type: "text", text }],
+		content: [
+			{
+				type: "text",
+				text: ok
+					? text
+					: formatHttpError(httpStatus, response.statusText, text),
+			},
+		],
 		meta: {
 			durationMs,
 			httpStatus,
@@ -257,6 +264,19 @@ async function executeOnce(
 	};
 	if (!ok) result.isError = true;
 	return result;
+}
+
+// On a non-2xx response the upstream body is often empty, leaving the caller
+// with no signal whether they hit a 401, 404, 500, … (see TASK-980 — an empty
+// error masked an auth bug for ages). Surface a `HTTP <status> <statusText>`
+// line, prefixing any upstream body rather than replacing it.
+function formatHttpError(
+	status: number,
+	statusText: string,
+	body: string,
+): string {
+	const statusLine = `HTTP ${status}${statusText ? ` ${statusText}` : ""}`;
+	return body.length > 0 ? `${statusLine}\n${body}` : statusLine;
 }
 
 function hasHeader(headers: Record<string, string>, name: string): boolean {

@@ -246,6 +246,30 @@ describe("router", () => {
 		await router.dispose();
 	});
 
+	it("classifies a non-2xx result with the exact status (http_404, not http_4xx)", async () => {
+		const adapter = makeAdapter({
+			content: [{ type: "text", text: "HTTP 404 Not Found" }],
+			isError: true,
+			meta: { durationMs: 3, httpStatus: 404 },
+		});
+		const audit = makeAuditLogger();
+		const router = await createRouter({
+			tools: [makeTool()],
+			secretStore: makeSecretStore({ LINEAR_API_KEY: "k" }),
+			auditLogger: audit,
+			profile: "coding",
+			adapterFactory: () => adapter,
+		});
+		const result = await router.call("linear__issue_search", { query: "abc" });
+		expect(result.isError).toBe(true);
+		const completed = audit.entries.find(
+			(e) => e.event === "upstream.completed",
+		) as Extract<AuditEntry, { event: "upstream.completed" }> | undefined;
+		expect(completed?.ok).toBe(false);
+		expect(completed?.errKind).toBe("http_404");
+		await router.dispose();
+	});
+
 	it("dispose disposes all adapters", async () => {
 		const disposeSpy = vi.fn(async () => {});
 		const adapter: UpstreamAdapter = {
