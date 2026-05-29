@@ -18,3 +18,10 @@ auth-profiles.yaml
 
 # Runtime data (e.g. SQLite DBs from upstream MCP children)
 data/
+
+# Session cookies, tokens, and other private material (see CLAUDE.md)
+sensitive_information/
+
+# Cookie-bridge native-host manifest is generated per-machine by register-host.ps1
+# (absolute path + local extension id). Commit only the .template.json.
+scripts/chrome-cookie-bridge/host/com.ichiba.cookie_host.json

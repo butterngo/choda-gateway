@@ -1,0 +1,7 @@
+{
+  "name": "com.ichiba.cookie_host",
+  "description": "Writes ichiba session cookies to the choda-gateway cookie-jar file",
+  "path": "run-host.bat",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://__EXTENSION_ID__/"]
+}
