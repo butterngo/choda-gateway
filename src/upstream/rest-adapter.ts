@@ -15,12 +15,18 @@ import {
 	withSlot,
 } from "./upstream-adapter.js";
 
+interface ResponseShape {
+	itemsPath?: string;
+	omit: string[];
+}
+
 interface RestUpstream {
 	type: "rest";
 	method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 	url: string;
 	headers?: Record<string, string>;
 	bodyTemplate?: unknown;
+	responseShape?: ResponseShape;
 }
 
 function assertRest(
@@ -252,7 +258,7 @@ async function executeOnce(
 			{
 				type: "text",
 				text: ok
-					? text
+					? shapeResponse(text, upstream.responseShape, ctx, call)
 					: formatHttpError(httpStatus, response.statusText, text),
 			},
 		],
@@ -277,6 +283,59 @@ function formatHttpError(
 ): string {
 	const statusLine = `HTTP ${status}${statusText ? ` ${statusText}` : ""}`;
 	return body.length > 0 ? `${statusLine}\n${body}` : statusLine;
+}
+
+// Trim heavy fields from a JSON response before it reaches the model. A no-op
+// when `shape` is absent or the body isn't JSON (returned verbatim so binary /
+// text endpoints are unaffected). With `itemsPath`, each element of that array
+// is trimmed; without it, the root object is trimmed.
+function shapeResponse(
+	text: string,
+	shape: ResponseShape | undefined,
+	ctx: AdapterContext,
+	call: NormalizedToolCall,
+): string {
+	if (!shape) return text;
+	let json: unknown;
+	try {
+		json = JSON.parse(text);
+	} catch {
+		ctx.logger.debug("responseShape: body not JSON, passing through", {
+			toolName: call.toolName,
+			correlationId: call.correlationId,
+		});
+		return text;
+	}
+	const omitFrom = (obj: unknown): void => {
+		if (obj === null || typeof obj !== "object" || Array.isArray(obj)) return;
+		for (const field of shape.omit) {
+			delete (obj as Record<string, unknown>)[field];
+		}
+	};
+	if (shape.itemsPath === undefined) {
+		omitFrom(json);
+	} else {
+		const target = getByPath(json, shape.itemsPath);
+		if (Array.isArray(target)) {
+			for (const item of target) omitFrom(item);
+		} else {
+			ctx.logger.debug("responseShape: itemsPath did not resolve to array", {
+				toolName: call.toolName,
+				correlationId: call.correlationId,
+				itemsPath: shape.itemsPath,
+			});
+		}
+	}
+	return JSON.stringify(json);
+}
+
+function getByPath(obj: unknown, path: string): unknown {
+	let current = obj;
+	for (const segment of path.split(".")) {
+		if (current === null || typeof current !== "object") return undefined;
+		current = (current as Record<string, unknown>)[segment];
+	}
+	return current;
 }
 
 function hasHeader(headers: Record<string, string>, name: string): boolean {

@@ -352,6 +352,103 @@ describe("rest-adapter — error content surfacing", () => {
 	});
 });
 
+describe("rest-adapter — responseShape", () => {
+	function shapeTool(responseShape: unknown): Tool {
+		return makeTool({
+			upstream: {
+				type: "rest",
+				method: "GET",
+				url: `http://127.0.0.1:${handle.port}/q`,
+				// biome-ignore lint/suspicious/noExplicitAny: test fixture
+				responseShape: responseShape as any,
+			},
+		});
+	}
+
+	it("omits listed fields from each element at itemsPath", async () => {
+		const body = JSON.stringify({
+			count: 2,
+			items: [
+				{ id: "1", name: "a", description: "HUGE", extensionData: { x: 1 } },
+				{ id: "2", name: "b", description: "HUGE", extensionData: { x: 2 } },
+			],
+		});
+		handle = await startServer(() => ({ status: 200, body }));
+		const adapter = createRestAdapter(
+			shapeTool({ itemsPath: "items", omit: ["description", "extensionData"] }),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		const parsed = JSON.parse((r.content[0] as { text: string }).text);
+		expect(parsed.count).toBe(2);
+		expect(parsed.items).toEqual([
+			{ id: "1", name: "a" },
+			{ id: "2", name: "b" },
+		]);
+		await adapter.dispose();
+	});
+
+	it("trims the root object when itemsPath is omitted", async () => {
+		const body = JSON.stringify({ id: "1", secret: "drop", keep: "yes" });
+		handle = await startServer(() => ({ status: 200, body }));
+		const adapter = createRestAdapter(
+			shapeTool({ omit: ["secret"] }),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(JSON.parse((r.content[0] as { text: string }).text)).toEqual({
+			id: "1",
+			keep: "yes",
+		});
+		await adapter.dispose();
+	});
+
+	it("passes a non-JSON body through untouched", async () => {
+		handle = await startServer(() => ({ status: 200, body: "plain text" }));
+		const adapter = createRestAdapter(
+			shapeTool({ itemsPath: "items", omit: ["description"] }),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(r.content[0]).toEqual({ type: "text", text: "plain text" });
+		await adapter.dispose();
+	});
+
+	it("leaves the body intact when itemsPath does not resolve to an array", async () => {
+		const body = JSON.stringify({ items: { not: "an array" } });
+		handle = await startServer(() => ({ status: 200, body }));
+		const adapter = createRestAdapter(
+			shapeTool({ itemsPath: "items", omit: ["not"] }),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(makeCall());
+		expect(JSON.parse((r.content[0] as { text: string }).text)).toEqual({
+			items: { not: "an array" },
+		});
+		await adapter.dispose();
+	});
+
+	it("does not shape a non-2xx body", async () => {
+		const body = JSON.stringify({ items: [{ id: "1", description: "HUGE" }] });
+		handle = await startServer(() => ({ status: 500, body }));
+		const adapter = createRestAdapter(
+			shapeTool({ itemsPath: "items", omit: ["description"] }),
+			noBackoff,
+		);
+		await adapter.init(makeCtx());
+		const r = await adapter.call(
+			makeCall({ policy: { ...makeCall().policy, retryPolicy: "none" } }),
+		);
+		expect((r.content[0] as { text: string }).text).toContain("HUGE");
+		expect(r.isError).toBe(true);
+		await adapter.dispose();
+	});
+});
+
 describe("rest-adapter — credential provider integration", () => {
 	it("merges provider-resolved headers into the outbound request", async () => {
 		handle = await startServer(() => ({ status: 200, body: '{"ok":true}' }));

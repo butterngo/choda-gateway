@@ -124,6 +124,25 @@
         },
         "bodyTemplate": {
           "description": "Optional request body. May contain {{input.*}} placeholders."
+        },
+        "responseShape": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["omit"],
+          "description": "Optional post-success trimming of the JSON response. Drops heavy fields before the body reaches the model. No-op on non-JSON or non-2xx responses.",
+          "properties": {
+            "itemsPath": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Dot-path to an array whose elements get trimmed. Omit to trim the root object."
+            },
+            "omit": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Top-level field names deleted from each targeted object."
+            }
+          }
         }
       }
     },

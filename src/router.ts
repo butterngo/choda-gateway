@@ -113,7 +113,12 @@ export async function createRouter(opts: RouterOptions): Promise<Router> {
 		((tool) =>
 			createAdapter(tool, { credentialProviders: opts.credentialProviders }));
 	const logger = opts.logger ?? NOOP_LOGGER;
-	const ajv = new Ajv({ allErrors: true, strict: false });
+	// useDefaults lets a tool's inputSchema declare `"default"` for optional
+	// fields; Ajv injects the value into `input` in place before it reaches the
+	// template engine, which throws on any unresolved `{{input.x}}`. This keeps
+	// optional body/url params (e.g. an empty `keyword` search) working without
+	// the caller having to pass them. Only fires where a schema declares a default.
+	const ajv = new Ajv({ allErrors: true, strict: false, useDefaults: true });
 	const compiled = new Map<string, CompiledTool>();
 
 	for (const tool of opts.tools) {

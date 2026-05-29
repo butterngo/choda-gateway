@@ -31,12 +31,25 @@ const UpstreamMcp = z.object({
 	remoteTool: z.string().min(1),
 });
 
+// Optional, post-success response trimming. Lets a tool drop heavy fields from
+// a JSON response before it reaches the model (e.g. a list endpoint that returns
+// a 25KB `description` per row). Applied only on 2xx; non-JSON bodies pass through
+// untouched. See createRestAdapter / shapeResponse.
+const ResponseShape = z.object({
+	// Dot-path to an array within the JSON body whose elements get trimmed.
+	// Omit to trim the root object itself.
+	itemsPath: z.string().min(1).optional(),
+	// Top-level field names deleted from each targeted object.
+	omit: z.array(z.string().min(1)).min(1),
+});
+
 const UpstreamRest = z.object({
 	type: z.literal("rest"),
 	method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
 	url: z.string().min(1),
 	headers: z.record(z.string(), z.string()).optional(),
 	bodyTemplate: z.unknown().optional(),
+	responseShape: ResponseShape.optional(),
 });
 
 const UpstreamCli = z.object({
