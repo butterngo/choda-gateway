@@ -358,10 +358,7 @@ if (invokedDirectly) {
 	main().catch((err) => {
 		const detail =
 			err instanceof Error ? (err.stack ?? err.message) : String(err);
-		dbg(`main rejected: ${detail}`);
-		process.stderr.write(
-			`error: ${err instanceof Error ? err.message : String(err)}\n`,
-		);
+		process.stderr.write(`error: ${detail}\n`);
 		process.exit(1);
 	});
 }
