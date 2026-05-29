@@ -126,6 +126,7 @@ export async function loadGatewayConfig(path: string): Promise<{
 	configDir: string;
 	resolvedToolsPath: string;
 	resolvedAuditPath: string;
+	resolvedAuthProfilesPath: string | undefined;
 }> {
 	const raw = await readFileOrThrow(path);
 	let parsed: unknown;
@@ -147,6 +148,9 @@ export async function loadGatewayConfig(path: string): Promise<{
 		configDir,
 		resolvedToolsPath: resolveRelative(result.data.toolsPath, configDir),
 		resolvedAuditPath: resolveRelative(result.data.auditPath, configDir),
+		resolvedAuthProfilesPath: result.data.authProfilesPath
+			? resolveRelative(result.data.authProfilesPath, configDir)
+			: undefined,
 	};
 }
 
