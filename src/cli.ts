@@ -2,9 +2,16 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { createAuditLogger } from "./audit/logger.js";
+import { collectProfileSecretRefs, loadProfiles } from "./auth/profiles.js";
+import { createProviderRegistry } from "./auth/providers/factory.js";
+import type { CredentialProvider } from "./auth/types.js";
 import { buildMcpServer, startStdioServer } from "./index.js";
 import { runIngest } from "./ingest/cli.js";
-import { loadGatewayConfig, loadToolsManifest } from "./manifest/loader.js";
+import {
+	assertAuthProfilesReferenced,
+	loadGatewayConfig,
+	loadToolsManifest,
+} from "./manifest/loader.js";
 import {
 	filterToolsByProfile,
 	resolveActiveProfile,
@@ -122,8 +129,27 @@ async function cmdStart(cli: ParsedCli): Promise<Router> {
 		);
 	}
 
+	const profilesPath = config.resolvedAuthProfilesPath;
+	if (!profilesPath) {
+		const toolsNeedingProfile = filtered.filter((t) => t.authProfile);
+		if (toolsNeedingProfile.length > 0) {
+			const refs = toolsNeedingProfile
+				.map((t) => `${t.name} -> ${t.authProfile}`)
+				.join("; ");
+			throw new Error(
+				`tool(s) declare authProfile but gateway.config.yaml has no authProfilesPath: ${refs}`,
+			);
+		}
+	}
+
 	const secretsPath = resolveSecretsPath(config.configDir);
-	const requiredSecrets = collectAllSecretRefs(filtered);
+	const requiredFromTools = collectAllSecretRefs(filtered);
+	const requiredFromProfiles = profilesPath
+		? await collectProfileSecretRefs(profilesPath)
+		: [];
+	const requiredSecrets = [
+		...new Set([...requiredFromTools, ...requiredFromProfiles]),
+	].sort();
 	let store: Awaited<ReturnType<typeof openSecretStore>>;
 	if (!existsSync(secretsPath) && requiredSecrets.length === 0) {
 		// No secrets needed and no store on disk — synthesise an empty store.
@@ -137,6 +163,22 @@ async function cmdStart(cli: ParsedCli): Promise<Router> {
 		});
 	}
 
+	let credentialProviders: ReadonlyMap<string, CredentialProvider> | undefined;
+	if (profilesPath) {
+		const { profiles, warnings } = await loadProfiles({
+			yamlPath: profilesPath,
+			secretStore: store,
+		});
+		for (const w of warnings) {
+			process.stderr.write(`warn: ${w}\n`);
+		}
+		credentialProviders = createProviderRegistry(profiles);
+		assertAuthProfilesReferenced(
+			{ tools: filtered },
+			new Set(credentialProviders.keys()),
+		);
+	}
+
 	const auditLogger = createAuditLogger({
 		filepath: config.resolvedAuditPath,
 		secretStore: store,
@@ -147,6 +189,7 @@ async function cmdStart(cli: ParsedCli): Promise<Router> {
 		secretStore: store,
 		auditLogger,
 		profile: profile.name,
+		credentialProviders,
 	});
 
 	const server = buildMcpServer({ router });
@@ -358,10 +401,7 @@ if (invokedDirectly) {
 	main().catch((err) => {
 		const detail =
 			err instanceof Error ? (err.stack ?? err.message) : String(err);
-		dbg(`main rejected: ${detail}`);
-		process.stderr.write(
-			`error: ${err instanceof Error ? err.message : String(err)}\n`,
-		);
+		process.stderr.write(`error: ${detail}\n`);
 		process.exit(1);
 	});
 }
