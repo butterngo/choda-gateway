@@ -75,6 +75,45 @@
       "timeoutMs": 30000,
       "retryPolicy": "none",
       "sideEffecting": false
+    },
+    {
+      "name": "shop__product_search",
+      "description": "Workspace-scoped REST search. Shows a path-segment enum (workspaceSlug) plus a required input (marketId) templated into BOTH a request header (x-market-id) and a query param (marketIds) — the pattern for upstreams that scope responses by a path workspace and a header/query market id together.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["workspaceSlug", "marketId"],
+        "properties": {
+          "workspaceSlug": {
+            "type": "string",
+            "enum": ["acme-store"],
+            "description": "Workspace (URL path segment). Add new workspace slugs to this enum as they come online."
+          },
+          "marketId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Market id (UUID) paired with workspaceSlug — sent as the x-market-id header and the marketIds query param. Must match the selected workspace."
+          },
+          "keyword": {
+            "type": "string",
+            "default": "",
+            "description": "Optional search term. Substituted verbatim into the query string."
+          }
+        }
+      },
+      "tags": ["example"],
+      "upstream": {
+        "type": "rest",
+        "method": "GET",
+        "url": "https://api.example.com/{{input.workspaceSlug}}/products?marketIds={{input.marketId}}&keyword={{input.keyword}}",
+        "headers": {
+          "Accept": "application/json",
+          "x-market-id": "{{input.marketId}}"
+        }
+      },
+      "concurrency": 8,
+      "timeoutMs": 30000,
+      "retryPolicy": "safe-idempotent",
+      "sideEffecting": false
     }
   ]
 }
