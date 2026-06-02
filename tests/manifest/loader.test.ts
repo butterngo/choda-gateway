@@ -118,7 +118,7 @@ describe("loadToolsManifest", () => {
 
 	it("loads tools.example.json from repo root", async () => {
 		const manifest = await loadToolsManifest("tools.example.json");
-		expect(manifest.tools).toHaveLength(3);
+		expect(manifest.tools).toHaveLength(4);
 	});
 });
 
