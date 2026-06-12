@@ -6,13 +6,13 @@ workspaceId: choda-gateway
 scope: project
 refs:
   - path: src/auth/providers/cookie-jar.ts
-    commitSha: 3ab090ec8157eb978330dfa39e9c2f4debc6da6d
+    commitSha: f98afebc602872e219edaa8e3340cf7e8d3f4f18
   - path: tools.json
-    commitSha: 3ab090ec8157eb978330dfa39e9c2f4debc6da6d
+    commitSha: f98afebc602872e219edaa8e3340cf7e8d3f4f18
   - path: auth-profiles.yaml
-    commitSha: 3ab090ec8157eb978330dfa39e9c2f4debc6da6d
+    commitSha: f98afebc602872e219edaa8e3340cf7e8d3f4f18
 createdAt: 2026-05-29
-lastVerifiedAt: 2026-05-29
+lastVerifiedAt: 2026-06-08
 ---
 
 The `ichiba__*` MCP tools authenticate via the `ichiba-session` cookie-jar profile (`auth-profiles.yaml`), which reads `sensitive_information/ichiba_cookies.txt`. When that file has only comments (initial state) or the `__BFF` cookie expires (~24h), every `ichiba__*` call returns HTTP 401.

@@ -2,8 +2,7 @@
 
 | Slug | Type | Title | Last verified | Stale |
 |------|------|-------|---------------|-------|
-| [refreshing-the-ichiba-session-cookie](./refreshing-the-ichiba-session-cookie.md) | learning | Refreshing the ichiba session cookie | 2026-05-29 |  |
-| [auto-refreshing-ichiba-cookie-bridge](./auto-refreshing-ichiba-cookie-bridge.md) | learning | Auto-refreshing the ichiba cookie via a Chrome native-messaging bridge | 2026-05-29 |  |
+| [refreshing-the-ichiba-session-cookie](./refreshing-the-ichiba-session-cookie.md) | learning | Refreshing the ichiba session cookie | 2026-06-08 |  |
 | [ADR-006-openapi-ingestion-credential-profiles](./ADR-006-openapi-ingestion-credential-profiles.md) | decision | ADR-006: OpenAPI ingestion + credential profiles — offline CLI emits manifest fragments, auth resolved at call time by named profile | 2026-05-28 |  |
 | [ADR-005-tool-naming-as-public-contract](./ADR-005-tool-naming-as-public-contract.md) | decision | ADR-005: Tool naming là public API contract — namespace__action, không version trong tên | 2026-05-18 |  |
 | [ADR-004-per-upstream-execution-policy](./ADR-004-per-upstream-execution-policy.md) | decision | ADR-004: Per-upstream execution policy — concurrency / timeout / retry / sideEffecting trong manifest | 2026-05-18 |  |
